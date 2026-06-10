@@ -104,7 +104,15 @@ export function Footer() {
           </p>
           <p>
             Prototype by{" "}
-            <span className="text-gold/80">SeJo Labs</span> · a concept demo
+            <a
+              href="https://sejolabs.com"
+              target="_blank"
+              rel="noopener noreferrer"
+              className="text-gold/80 underline-offset-2 hover:text-gold hover:underline"
+            >
+              SeJo Labs LLC
+            </a>{" "}
+            · Pleasant Valley, MO
           </p>
         </div>
       </div>

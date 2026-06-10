@@ -58,9 +58,8 @@ export function Hero() {
           transition={{ duration: 0.9, ease, delay: 0.38 }}
           className="mx-auto mt-6 max-w-xl text-pretty text-base leading-relaxed text-cream/80 sm:text-lg"
         >
-          Home-cooked, authentic Italian in the heart of downtown — the same
-          family recipes and warm hospitality we&rsquo;ve served on Grand Avenue
-          for {RESTAURANT.yearsOfLegacy} years.
+          Order online. Same kitchen. Same drivers. Zero commissions to
+          third-party apps.
         </motion.p>
 
         <motion.div
