@@ -1,26 +1,179 @@
 @import "tailwindcss";
 
+/* ===========================================================================
+   Anthony's — design system
+   Palette drawn from the restaurant's own signage & interior: a deep wine
+   crimson, antique Tuscan gold, warm parchment cream, and espresso near-black.
+   Honors a 48-year Italian legacy; elevated with editorial serif typography
+   and generous negative space.
+   =========================================================================== */
+
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --crimson: #8b1a1a;
+  --crimson-deep: #5c1212;
+  --crimson-ink: #3a0c0c;
+  --gold: #c9a24b;
+  --gold-light: #e3c77a;
+  --gold-deep: #9c7a2f;
+  --cream: #f6eee1;
+  --cream-deep: #efe3cf;
+  --parchment: #fbf7ef;
+  --espresso: #221610;
+  --espresso-soft: #3a2a20;
+  --charcoal: #16100b;
+  --basil: #4b6043;
+
+  --background: var(--parchment);
+  --foreground: var(--espresso);
+
+  --shadow-soft: 0 1px 2px rgba(34, 22, 16, 0.04),
+    0 12px 32px -12px rgba(34, 22, 16, 0.18);
+  --shadow-lift: 0 2px 6px rgba(34, 22, 16, 0.08),
+    0 28px 56px -20px rgba(58, 12, 12, 0.32);
 }
 
 @theme inline {
   --color-background: var(--background);
   --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+
+  --color-crimson: var(--crimson);
+  --color-crimson-deep: var(--crimson-deep);
+  --color-crimson-ink: var(--crimson-ink);
+  --color-gold: var(--gold);
+  --color-gold-light: var(--gold-light);
+  --color-gold-deep: var(--gold-deep);
+  --color-cream: var(--cream);
+  --color-cream-deep: var(--cream-deep);
+  --color-parchment: var(--parchment);
+  --color-espresso: var(--espresso);
+  --color-espresso-soft: var(--espresso-soft);
+  --color-charcoal: var(--charcoal);
+  --color-basil: var(--basil);
+
+  --font-display: var(--font-playfair);
+  --font-serif: var(--font-cormorant);
+  --font-sans: var(--font-inter);
+
+  --shadow-soft: var(--shadow-soft);
+  --shadow-lift: var(--shadow-lift);
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+* {
+  -webkit-font-smoothing: antialiased;
+  text-rendering: optimizeLegibility;
+}
+
+html {
+  scroll-behavior: smooth;
+  /* offset for sticky header when jumping to category anchors */
+  scroll-padding-top: 5.5rem;
 }
 
 body {
   background: var(--background);
   color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-inter), ui-sans-serif, system-ui, sans-serif;
+}
+
+/* The "warm Italian premium" unified photo treatment. Every dish & ambient
+   photo gets the same look so mixed sources read as one coherent shoot. */
+.photo-treat {
+  filter: saturate(1.08) contrast(1.03) brightness(0.99) sepia(0.06);
+}
+
+/* Fine gold hairline used across cards, dividers, inputs. */
+.rule-gold {
+  border-color: color-mix(in srgb, var(--gold) 45%, transparent);
+}
+
+/* Letter-spaced overline label. */
+.overline {
+  font-family: var(--font-inter), sans-serif;
+  text-transform: uppercase;
+  letter-spacing: 0.28em;
+  font-weight: 500;
+  font-size: 0.72rem;
+}
+
+/* Thin double-rule ornament for section headers. */
+.ornament {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.75rem;
+  color: var(--gold);
+}
+.ornament::before,
+.ornament::after {
+  content: "";
+  height: 1px;
+  width: clamp(2rem, 8vw, 4.5rem);
+  background: linear-gradient(
+    to var(--orn-dir, right),
+    transparent,
+    color-mix(in srgb, var(--gold) 70%, transparent)
+  );
+}
+
+/* Custom scrollbar in the dark KDS + cart areas. */
+.scroll-elegant::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+.scroll-elegant::-webkit-scrollbar-thumb {
+  background: color-mix(in srgb, var(--gold) 40%, transparent);
+  border-radius: 999px;
+}
+.scroll-elegant::-webkit-scrollbar-track {
+  background: transparent;
+}
+
+/* Reusable focus ring — soft gold, never a harsh blue. */
+.focus-gold:focus-visible {
+  outline: none;
+  border-color: var(--gold);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--gold) 28%, transparent);
+}
+
+@keyframes shimmer {
+  0% {
+    background-position: -480px 0;
+  }
+  100% {
+    background-position: 480px 0;
+  }
+}
+.blur-load {
+  background-image: linear-gradient(
+    100deg,
+    var(--cream-deep) 30%,
+    color-mix(in srgb, var(--gold-light) 35%, var(--cream-deep)) 50%,
+    var(--cream-deep) 70%
+  );
+  background-size: 960px 100%;
+  animation: shimmer 1.6s linear infinite;
+}
+
+@keyframes pulse-ring {
+  0% {
+    box-shadow: 0 0 0 0 color-mix(in srgb, var(--gold) 55%, transparent);
+  }
+  70% {
+    box-shadow: 0 0 0 12px transparent;
+  }
+  100% {
+    box-shadow: 0 0 0 0 transparent;
+  }
+}
+.pulse-ring {
+  animation: pulse-ring 1.8s ease-out infinite;
+}
+
+@media (prefers-reduced-motion: reduce) {
+  html {
+    scroll-behavior: auto;
+  }
+  .blur-load,
+  .pulse-ring {
+    animation: none;
+  }
 }

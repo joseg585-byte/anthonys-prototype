@@ -32,6 +32,11 @@ yarn-error.log*
 
 # env files (can opt-in for committing if needed)
 .env*
+# ...but DO ship the env template so the next dev knows what to set
+!.env.example
+
+# SeJo Labs — credentials handed to the client. NEVER commit.
+ADMIN_CREDENTIALS.md
 
 # vercel
 .vercel
