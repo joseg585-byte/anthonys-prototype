@@ -1,14 +1,21 @@
 "use client";
 
 import Image from "next/image";
+import Link from "next/link";
 import { motion } from "framer-motion";
 import { RESTAURANT } from "@/data/restaurant";
 
 const ease = [0.22, 1, 0.36, 1] as const;
 
+const BADGES = [
+  { text: "No customer service fees", vs: "vs Menufy" },
+  { text: "Delivery on this site", vs: "vs leaving to DoorDash" },
+  { text: "You own your customer data", vs: "vs Menufy owns it" },
+];
+
 export function Hero() {
   return (
-    <section className="relative flex min-h-[100svh] items-center justify-center overflow-hidden">
+    <section className="relative flex min-h-[100svh] flex-col items-center justify-center overflow-hidden">
       {/* Real interior photograph — warm dim dining room. */}
       <Image
         src="/images/ambient/hero-interior.jpg"
@@ -58,8 +65,8 @@ export function Hero() {
           transition={{ duration: 0.9, ease, delay: 0.38 }}
           className="mx-auto mt-6 max-w-xl text-pretty text-base leading-relaxed text-cream/80 sm:text-lg"
         >
-          Order online. Same kitchen. Same drivers. Zero commissions to
-          third-party apps.
+          Order pickup or delivery. Reserve a table. Send a gift card. All in
+          one place — no service fees, no third-party middlemen.
         </motion.p>
 
         <motion.div
@@ -74,12 +81,31 @@ export function Hero() {
           >
             Explore the Menu
           </a>
-          <a
-            href="#heritage"
+          <Link
+            href="/reserve"
             className="inline-flex items-center justify-center rounded-full border border-cream/35 px-8 py-3.5 text-sm font-medium tracking-wide text-cream transition-all duration-200 hover:border-gold hover:text-gold"
           >
-            Our Story
-          </a>
+            Reserve a Table
+          </Link>
+        </motion.div>
+
+        {/* Comparison strip */}
+        <motion.div
+          initial={{ opacity: 0, y: 16 }}
+          animate={{ opacity: 1, y: 0 }}
+          transition={{ duration: 0.9, ease, delay: 0.65 }}
+          className="mt-8 flex flex-wrap items-center justify-center gap-3"
+        >
+          {BADGES.map((b) => (
+            <span
+              key={b.text}
+              className="inline-flex items-center gap-1.5 rounded-full border border-basil/40 bg-basil/10 px-3.5 py-1.5 text-xs font-medium text-cream/85 backdrop-blur-sm"
+            >
+              <span className="text-basil">✓</span>
+              {b.text}
+              <span className="text-cream/45">({b.vs})</span>
+            </span>
+          ))}
         </motion.div>
       </div>
 

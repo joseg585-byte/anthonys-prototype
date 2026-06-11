@@ -87,5 +87,74 @@ export interface Order {
   deliveryAddress?: string;
   pickupTime?: string;
   paymentMethod: PaymentMethod;
+  driverAssigned?: boolean;
   createdAt: number; // epoch ms
+}
+
+// ── Reservations ──────────────────────────────────────────────────────────────
+
+export type ReservationStatus =
+  | "pending"
+  | "confirmed"
+  | "declined"
+  | "alternate-suggested";
+
+export type OccasionType =
+  | "none"
+  | "anniversary"
+  | "birthday"
+  | "business"
+  | "other";
+
+export type PartySizeOption = "1-2" | "3-4" | "5-6" | "7-8" | "9+";
+
+export interface Reservation {
+  id: string;
+  restaurantSlug: string;
+  status: ReservationStatus;
+  name: string;
+  email: string;
+  phone: string;
+  partySize: PartySizeOption;
+  date: string;            // YYYY-MM-DD
+  time: string;            // "4:00 PM"
+  occasion: OccasionType;
+  specialRequests?: string;
+  customerId?: string;
+  adminNote?: string;
+  suggestedTime?: string;
+  createdAt: number;
+}
+
+// ── Gift Cards ─────────────────────────────────────────────────────────────────
+
+export type GiftCardStatus = "active" | "used" | "expired";
+
+export interface GiftCard {
+  id: string;
+  code: string;
+  restaurantSlug: string;
+  amountCents: number;
+  balanceCents: number;
+  recipientName: string;
+  recipientEmail: string;
+  senderName: string;
+  senderEmail: string;
+  message?: string;
+  deliverAt?: string;      // ISO date string, empty/undefined = immediate
+  status: GiftCardStatus;
+  purchasedAt: number;
+}
+
+// ── Customer Profile ──────────────────────────────────────────────────────────
+
+export interface CustomerProfile {
+  id: string;
+  firstName: string;
+  lastName: string;
+  email: string;
+  phone: string;
+  savedAddresses: string[];
+  favoriteItemIds: string[];
+  createdAt: number;
 }

@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useMemo, useState } from "react";
+import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
 import {
   X,
@@ -10,25 +11,33 @@ import {
   ArrowLeft,
   Check,
   Trash2,
+  Truck,
+  MapPin,
+  ExternalLink,
 } from "lucide-react";
 import { useCart, cartSubtotal, cartCount } from "@/lib/store";
 import { useOrders } from "@/lib/orders";
+import { useAuth } from "@/lib/auth";
 import { useHasMounted } from "@/lib/useHasMounted";
 import { formatPrice } from "@/lib/format";
 import { RESTAURANT } from "@/data/restaurant";
 import type { Order } from "@/lib/types";
 
+const DELIVERY_FEE_CENTS = 499;
+
 type Step = "cart" | "checkout" | "success";
+type OrderMode = "pickup" | "delivery";
 
 interface FormState {
   firstName: string;
   lastName: string;
   email: string;
   phone: string;
+  deliveryAddress: string;
 }
 type FieldErrors = Partial<Record<keyof FormState, string>>;
 
-function validate(f: FormState): FieldErrors {
+function validate(f: FormState, mode: OrderMode): FieldErrors {
   const e: FieldErrors = {};
   if (!f.firstName.trim()) e.firstName = "We'll need a first name";
   if (!f.lastName.trim()) e.lastName = "And a last name";
@@ -36,6 +45,8 @@ function validate(f: FormState): FieldErrors {
     e.email = "Enter a valid email";
   if (f.phone.replace(/\D/g, "").length < 10)
     e.phone = "Enter a 10-digit phone";
+  if (mode === "delivery" && !f.deliveryAddress.trim())
+    e.deliveryAddress = "Enter a delivery address";
   return e;
 }
 
@@ -47,24 +58,46 @@ export function CartDrawer() {
   const remove = useCart((s) => s.remove);
   const clear = useCart((s) => s.clear);
   const placeOrder = useOrders((s) => s.placeOrder);
+  const profile = useAuth((s) => s.profile);
   const mounted = useHasMounted();
 
   const [step, setStep] = useState<Step>("cart");
+  const [mode, setMode] = useState<OrderMode>("pickup");
   const [form, setForm] = useState<FormState>({
     firstName: "",
     lastName: "",
     email: "",
     phone: "",
+    deliveryAddress: "",
   });
   const [touched, setTouched] = useState<Record<string, boolean>>({});
   const [submitted, setSubmitted] = useState(false);
   const [placed, setPlaced] = useState<Order | null>(null);
 
+  // Pre-fill from profile when drawer opens
+  useEffect(() => {
+    if (isOpen && profile) {
+      setForm((f) => ({
+        ...f,
+        firstName: f.firstName || profile.firstName,
+        lastName: f.lastName || profile.lastName,
+        email: f.email || profile.email,
+        phone: f.phone || profile.phone,
+        deliveryAddress:
+          f.deliveryAddress ||
+          (profile.savedAddresses.length > 0
+            ? profile.savedAddresses[0]
+            : ""),
+      }));
+    }
+  }, [isOpen, profile]);
+
   const subtotal = mounted ? cartSubtotal(lines) : 0;
-  const tax = Math.round(subtotal * RESTAURANT.taxRate);
-  const total = subtotal + tax;
+  const deliveryFee = mode === "delivery" ? DELIVERY_FEE_CENTS : 0;
+  const tax = Math.round((subtotal + deliveryFee) * RESTAURANT.taxRate);
+  const total = subtotal + deliveryFee + tax;
   const count = mounted ? cartCount(lines) : 0;
-  const errors = useMemo(() => validate(form), [form]);
+  const errors = useMemo(() => validate(form, mode), [form, mode]);
 
   // lock body scroll + Escape to close
   useEffect(() => {
@@ -82,17 +115,35 @@ export function CartDrawer() {
   const handlePlace = () => {
     setSubmitted(true);
     if (Object.keys(errors).length > 0) return;
+
+    // Simulate DoorDash Drive driver assignment for delivery orders
+    if (mode === "delivery") {
+      const driverId = `DD-${Math.floor(Math.random() * 90000 + 10000)}`;
+      console.log(
+        `[DOORDASH DRIVE] Driver assigned: ${driverId} for delivery to ${form.deliveryAddress}`,
+      );
+    }
+
     const order = placeOrder({
       firstName: form.firstName.trim(),
       lastName: form.lastName.trim(),
       email: form.email.trim(),
       phone: form.phone.trim(),
       lines,
-      subtotalCents: subtotal,
+      subtotalCents: subtotal + deliveryFee,
       source: "online",
-      orderType: "pickup",
+      orderType: mode,
+      deliveryAddress:
+        mode === "delivery" ? form.deliveryAddress.trim() : undefined,
       paymentMethod: "paid-online",
-    });
+      driverAssigned: mode === "delivery",
+    } as Parameters<typeof placeOrder>[0]);
+
+    // Save new delivery address to profile
+    if (mode === "delivery" && profile && form.deliveryAddress.trim()) {
+      useAuth.getState().addAddress(form.deliveryAddress.trim());
+    }
+
     setPlaced(order);
     clear();
     setStep("success");
@@ -102,7 +153,14 @@ export function CartDrawer() {
     close();
     setTimeout(() => {
       setStep("cart");
-      setForm({ firstName: "", lastName: "", email: "", phone: "" });
+      setMode("pickup");
+      setForm({
+        firstName: "",
+        lastName: "",
+        email: "",
+        phone: "",
+        deliveryAddress: "",
+      });
       setTouched({});
       setSubmitted(false);
       setPlaced(null);
@@ -183,7 +241,7 @@ export function CartDrawer() {
                 )}
                 <h2 className="font-display text-xl font-semibold">
                   {step === "cart" && "Your Order"}
-                  {step === "checkout" && "Guest Checkout"}
+                  {step === "checkout" && "Checkout"}
                   {step === "success" && "Order Confirmed"}
                 </h2>
               </div>
@@ -196,7 +254,7 @@ export function CartDrawer() {
               </button>
             </div>
 
-            {/* CART STEP */}
+            {/* ── CART STEP ── */}
             {step === "cart" && (
               <div className="flex flex-1 flex-col">
                 {count === 0 ? (
@@ -220,6 +278,36 @@ export function CartDrawer() {
                   </div>
                 ) : (
                   <>
+                    {/* Pickup / Delivery toggle */}
+                    <div className="border-b border-gold/10 px-5 py-3">
+                      <div className="flex overflow-hidden rounded-full border border-gold/25 bg-cream">
+                        {(["pickup", "delivery"] as const).map((m) => (
+                          <button
+                            key={m}
+                            onClick={() => setMode(m)}
+                            className={`flex-1 py-2 text-xs font-semibold capitalize transition-all ${
+                              mode === m
+                                ? "bg-crimson text-cream"
+                                : "text-espresso-soft/60 hover:text-espresso"
+                            }`}
+                          >
+                            {m === "delivery" && (
+                              <Truck
+                                size={11}
+                                className="mr-1 inline-block"
+                              />
+                            )}
+                            {m}
+                          </button>
+                        ))}
+                      </div>
+                      {mode === "delivery" && (
+                        <p className="mt-2 text-center text-xs text-espresso-soft/60">
+                          Flat $4.99 delivery fee · Powered by DoorDash Drive
+                        </p>
+                      )}
+                    </div>
+
                     <ul className="flex-1 divide-y divide-gold/12 px-5">
                       {lines.map((l) => (
                         <li key={l.key} className="flex gap-3 py-4">
@@ -227,7 +315,6 @@ export function CartDrawer() {
                             <p className="font-display text-base font-semibold text-espresso">
                               {l.name}
                             </p>
-                            {/* Selected modifiers */}
                             {l.modifiers.length > 0 && (
                               <ul className="mt-0.5 space-y-0.5">
                                 {l.modifiers.map((m) => (
@@ -245,7 +332,6 @@ export function CartDrawer() {
                                 ))}
                               </ul>
                             )}
-                            {/* Special requests */}
                             {l.specialRequests && (
                               <p className="mt-1 text-xs italic text-espresso-soft/60">
                                 &ldquo;{l.specialRequests}&rdquo;
@@ -295,6 +381,7 @@ export function CartDrawer() {
                     </ul>
                     <CartFooter
                       subtotal={subtotal}
+                      deliveryFee={deliveryFee}
                       tax={tax}
                       total={total}
                       cta="Proceed to Checkout"
@@ -305,14 +392,40 @@ export function CartDrawer() {
               </div>
             )}
 
-            {/* CHECKOUT STEP */}
+            {/* ── CHECKOUT STEP ── */}
             {step === "checkout" && (
               <div className="flex flex-1 flex-col">
                 <div className="flex-1 space-y-4 px-5 py-6">
                   <p className="text-sm text-espresso-soft/75">
-                    Almost there — tell us who&rsquo;s picking up. We&rsquo;ll
-                    text you the moment it&rsquo;s ready.
+                    {mode === "pickup"
+                      ? "Almost there — tell us who's picking up."
+                      : "Almost there — confirm your delivery details."}
                   </p>
+
+                  {/* Order type reminder */}
+                  <div
+                    className={`flex items-center gap-2 rounded-lg px-3 py-2 text-xs font-medium ${
+                      mode === "delivery"
+                        ? "bg-crimson/10 text-crimson"
+                        : "bg-gold/10 text-gold-deep"
+                    }`}
+                  >
+                    {mode === "delivery" ? (
+                      <Truck size={14} />
+                    ) : (
+                      <ShoppingBag size={14} />
+                    )}
+                    {mode === "delivery"
+                      ? "Delivery · $4.99 flat fee · ~35 min via DoorDash"
+                      : "Pickup · Ready in ~20 min"}
+                    <button
+                      onClick={() => setStep("cart")}
+                      className="ml-auto underline opacity-70"
+                    >
+                      Change
+                    </button>
+                  </div>
+
                   <div className="grid grid-cols-2 gap-3">
                     {field("firstName", "First Name", "text", "Maria")}
                     {field("lastName", "Last Name", "text", "Russo")}
@@ -320,13 +433,87 @@ export function CartDrawer() {
                   {field("email", "Email", "email", "maria@email.com")}
                   {field("phone", "Phone", "tel", "(816) 555-0148")}
 
+                  {mode === "delivery" && (
+                    <label className="block">
+                      <span className="overline text-[0.62rem] text-espresso-soft/70">
+                        Delivery Address
+                      </span>
+                      <div className="relative mt-1.5">
+                        <MapPin
+                          size={14}
+                          className="absolute left-3.5 top-1/2 -translate-y-1/2 text-espresso-soft/40"
+                        />
+                        <input
+                          type="text"
+                          value={form.deliveryAddress}
+                          placeholder="123 Main St, Kansas City, MO"
+                          onChange={(e) =>
+                            setForm({
+                              ...form,
+                              deliveryAddress: e.target.value,
+                            })
+                          }
+                          onBlur={() =>
+                            setTouched({ ...touched, deliveryAddress: true })
+                          }
+                          className={`focus-gold w-full rounded-lg border bg-cream/70 py-2.5 pl-10 pr-4 text-sm text-espresso placeholder:text-espresso-soft/40 ${
+                            (touched.deliveryAddress || submitted) &&
+                            errors.deliveryAddress
+                              ? "border-gold-deep"
+                              : "border-gold/25"
+                          }`}
+                        />
+                      </div>
+                      <AnimatePresence>
+                        {(touched.deliveryAddress || submitted) &&
+                          errors.deliveryAddress && (
+                            <motion.span
+                              initial={{ opacity: 0, height: 0 }}
+                              animate={{ opacity: 1, height: "auto" }}
+                              exit={{ opacity: 0, height: 0 }}
+                              className="mt-1 block text-xs text-gold-deep"
+                            >
+                              {errors.deliveryAddress}
+                            </motion.span>
+                          )}
+                      </AnimatePresence>
+                      {profile &&
+                        profile.savedAddresses.length > 0 &&
+                        !form.deliveryAddress && (
+                          <div className="mt-2 flex flex-wrap gap-1.5">
+                            {profile.savedAddresses
+                              .slice(0, 3)
+                              .map((addr) => (
+                                <button
+                                  key={addr}
+                                  onClick={() =>
+                                    setForm({
+                                      ...form,
+                                      deliveryAddress: addr,
+                                    })
+                                  }
+                                  className="flex items-center gap-1 rounded-full border border-gold/25 bg-cream px-2.5 py-1 text-xs text-espresso-soft transition-colors hover:border-gold hover:text-espresso"
+                                >
+                                  <MapPin size={10} />
+                                  {addr.slice(0, 28)}
+                                  {addr.length > 28 ? "…" : ""}
+                                </button>
+                              ))}
+                          </div>
+                        )}
+                    </label>
+                  )}
+
                   <div className="rounded-lg border border-gold/20 bg-cream/60 p-4">
                     <p className="overline mb-2 text-[0.6rem] text-espresso-soft/60">
                       Order Summary
                     </p>
                     <ul className="space-y-1 text-sm text-espresso-soft/80">
                       {lines.map((l) => (
-                        <li key={l.key} className="flex justify-between gap-2">
+                        <li
+                          key={l.key}
+                          className="flex justify-between gap-2"
+                        >
                           <span className="truncate">
                             {l.qty}× {l.name}
                             {l.modifiers.length > 0 &&
@@ -340,6 +527,7 @@ export function CartDrawer() {
                 </div>
                 <CartFooter
                   subtotal={subtotal}
+                  deliveryFee={deliveryFee}
                   tax={tax}
                   total={total}
                   cta="Place Order"
@@ -348,7 +536,7 @@ export function CartDrawer() {
               </div>
             )}
 
-            {/* SUCCESS STEP */}
+            {/* ── SUCCESS STEP ── */}
             {step === "success" && placed && (
               <motion.div
                 initial={{ opacity: 0, y: 12 }}
@@ -371,19 +559,47 @@ export function CartDrawer() {
                 <h3 className="mt-6 font-display text-2xl font-bold text-espresso">
                   Grazie, {placed.customerFirstName}!
                 </h3>
-                <p className="mt-2 max-w-xs text-sm text-espresso-soft/75">
-                  Your order is in the kitchen. We&rsquo;ll text{" "}
-                  <span className="font-medium text-espresso">{placed.phone}</span>{" "}
-                  when it&rsquo;s ready for pickup.
-                </p>
+
+                {placed.orderType === "delivery" ? (
+                  <div className="mt-3 space-y-2">
+                    <p className="flex items-center justify-center gap-2 text-sm font-medium text-espresso">
+                      <Truck size={15} className="text-crimson" />
+                      Your DoorDash driver will arrive in ~35 min.
+                    </p>
+                    <Link
+                      href={`/track/${placed.id}`}
+                      onClick={resetAndClose}
+                      className="inline-flex items-center gap-1.5 text-sm text-crimson underline underline-offset-2 hover:text-crimson-deep"
+                    >
+                      Live tracking
+                      <ExternalLink size={13} />
+                    </Link>
+                  </div>
+                ) : (
+                  <p className="mt-2 max-w-xs text-sm text-espresso-soft/75">
+                    Your order is in the kitchen. We&rsquo;ll text{" "}
+                    <span className="font-medium text-espresso">
+                      {placed.phone}
+                    </span>{" "}
+                    when it&rsquo;s ready for pickup.
+                  </p>
+                )}
 
                 <div className="mt-6 w-full rounded-xl border border-gold/25 bg-cream p-5">
                   <p className="overline text-[0.6rem] text-espresso-soft/60">
-                    Pickup Ticket
+                    {placed.orderType === "delivery"
+                      ? "Delivery Ticket"
+                      : "Pickup Ticket"}
                   </p>
                   <p className="mt-1 font-display text-4xl font-bold tracking-wide text-crimson">
                     {placed.shortCode}
                   </p>
+                  {placed.orderType === "delivery" && placed.deliveryAddress && (
+                    <p className="mt-1 flex items-center justify-center gap-1 text-xs text-espresso-soft/70">
+                      <MapPin size={11} />
+                      {placed.deliveryAddress}
+                    </p>
+                  )}
                   <div className="mt-4 space-y-1.5 border-t border-gold/15 pt-4 text-left text-sm text-espresso-soft/80">
                     {placed.items.map((it, i) => (
                       <div key={i}>
@@ -437,12 +653,14 @@ export function CartDrawer() {
 
 function CartFooter({
   subtotal,
+  deliveryFee,
   tax,
   total,
   cta,
   onCta,
 }: {
   subtotal: number;
+  deliveryFee: number;
   tax: number;
   total: number;
   cta: string;
@@ -455,6 +673,15 @@ function CartFooter({
           <dt>Subtotal</dt>
           <dd>{formatPrice(subtotal)}</dd>
         </div>
+        {deliveryFee > 0 && (
+          <div className="flex justify-between text-espresso-soft/75">
+            <dt className="flex items-center gap-1">
+              <Truck size={12} />
+              Delivery
+            </dt>
+            <dd>{formatPrice(deliveryFee)}</dd>
+          </div>
+        )}
         <div className="flex justify-between text-espresso-soft/75">
           <dt>Tax</dt>
           <dd>{formatPrice(tax)}</dd>
