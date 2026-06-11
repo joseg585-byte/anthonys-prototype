@@ -3,11 +3,12 @@
 import { useState } from "react";
 import { motion } from "framer-motion";
 import { Plus, Check, Leaf, Sprout } from "lucide-react";
-import type { MenuItem, MenuAddon } from "@/lib/types";
-import { formatPrice, formatAddon } from "@/lib/format";
+import type { MenuItem, CartModifier } from "@/lib/types";
+import { formatPrice } from "@/lib/format";
 import { useCart } from "@/lib/store";
 import { useMenuAvail } from "@/lib/menuStore";
 import { SmartImage } from "./SmartImage";
+import { ModifierModal } from "./ModifierModal";
 
 function DietTags({ item }: { item: MenuItem }) {
   if (!item.tags?.length) return null;
@@ -29,7 +30,7 @@ function DietTags({ item }: { item: MenuItem }) {
 function AddControl({ item }: { item: MenuItem }) {
   const add = useCart((s) => s.add);
   const available = useMenuAvail((s) => s.isAvailable(item.id));
-  const [addon, setAddon] = useState<MenuAddon | undefined>(undefined);
+  const [showModal, setShowModal] = useState(false);
   const [justAdded, setJustAdded] = useState(false);
 
   if (!available) {
@@ -40,35 +41,25 @@ function AddControl({ item }: { item: MenuItem }) {
     );
   }
 
-  const handleAdd = () => {
-    add(item, addon);
+  const hasModifiers = (item.modifiers?.length ?? 0) > 0;
+  const needsModal = hasModifiers || item.allowsSpecialRequests;
+
+  const handleAddDirect = () => {
+    add(item, [], undefined, 1);
+    setJustAdded(true);
+    setTimeout(() => setJustAdded(false), 1100);
+  };
+
+  const handleModalAdd = (modifiers: CartModifier[], specialRequests: string, qty: number) => {
+    add(item, modifiers, specialRequests || undefined, qty);
     setJustAdded(true);
     setTimeout(() => setJustAdded(false), 1100);
   };
 
   return (
-    <div className="flex items-center gap-2">
-      {item.addons?.length ? (
-        <select
-          aria-label={`Add-on for ${item.name}`}
-          value={addon?.label ?? ""}
-          onChange={(e) =>
-            setAddon(
-              item.addons?.find((a) => a.label === e.target.value) ?? undefined,
-            )
-          }
-          className="focus-gold max-w-[8.5rem] truncate rounded-full border border-gold/30 bg-cream px-3 py-1.5 text-xs text-espresso/80 transition-colors"
-        >
-          <option value="">No add-on</option>
-          {item.addons.map((a) => (
-            <option key={a.label} value={a.label}>
-              {a.label} {formatAddon(a.priceCents)}
-            </option>
-          ))}
-        </select>
-      ) : null}
+    <>
       <button
-        onClick={handleAdd}
+        onClick={needsModal ? () => setShowModal(true) : handleAddDirect}
         aria-label={`Add ${item.name} to order`}
         className={`group/btn inline-flex items-center gap-1.5 rounded-full px-3.5 py-1.5 text-xs font-semibold shadow-sm transition-all duration-200 active:scale-90 ${
           justAdded
@@ -82,12 +73,23 @@ function AddControl({ item }: { item: MenuItem }) {
           </>
         ) : (
           <>
-            <Plus size={14} className="transition-transform group-hover/btn:rotate-90" />
+            <Plus
+              size={14}
+              className="transition-transform group-hover/btn:rotate-90"
+            />
             Add
           </>
         )}
       </button>
-    </div>
+
+      {showModal && (
+        <ModifierModal
+          item={item}
+          onClose={() => setShowModal(false)}
+          onAdd={handleModalAdd}
+        />
+      )}
+    </>
   );
 }
 
@@ -132,6 +134,11 @@ export function MenuItemCard({ item }: { item: MenuItem }) {
           <p className="mt-2 flex-1 text-sm leading-relaxed text-espresso-soft/80">
             {item.description}
           </p>
+          {(item.modifiers?.length ?? 0) > 0 && (
+            <p className="mt-1 text-[0.68rem] text-gold-deep/80">
+              Customisable
+            </p>
+          )}
           <div className="mt-4 flex items-center justify-end">
             <AddControl item={item} />
           </div>
@@ -165,7 +172,12 @@ export function MenuItemCard({ item }: { item: MenuItem }) {
       </p>
 
       <div className="mt-4 flex items-center justify-between">
-        <DietTags item={item} />
+        <div className="flex items-center gap-2">
+          <DietTags item={item} />
+          {(item.modifiers?.length ?? 0) > 0 && (
+            <span className="text-[0.68rem] text-gold-deep/80">Customisable</span>
+          )}
+        </div>
         <div className="ml-auto">
           <AddControl item={item} />
         </div>

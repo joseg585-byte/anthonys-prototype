@@ -2,11 +2,12 @@
 
 import { useEffect, useState } from "react";
 import Link from "next/link";
-import { motion } from "framer-motion";
-import { MonitorPlay, ListChecks, ArrowUpRight, LogOut } from "lucide-react";
+import { AnimatePresence, motion } from "framer-motion";
+import { MonitorPlay, ListChecks, ArrowUpRight, LogOut, Phone } from "lucide-react";
 import { AdminLogin } from "@/components/admin/AdminLogin";
 import { KDS } from "@/components/admin/KDS";
 import { MenuManager } from "@/components/admin/MenuManager";
+import { PhoneOrderForm } from "@/components/admin/PhoneOrderForm";
 import { useChime } from "@/lib/useChime";
 
 type Tab = "kds" | "menu";
@@ -16,6 +17,7 @@ export default function AdminPage() {
   const [checked, setChecked] = useState(false);
   const [tab, setTab] = useState<Tab>("kds");
   const [soundOn, setSoundOn] = useState(true);
+  const [showPhoneForm, setShowPhoneForm] = useState(false);
   const { chime, unlock } = useChime();
 
   useEffect(() => {
@@ -29,7 +31,7 @@ export default function AdminPage() {
     return (
       <AdminLogin
         onUnlock={() => {
-          unlock(); // unlock WebAudio within the user gesture
+          unlock();
           setUnlocked(true);
         }}
       />
@@ -71,7 +73,11 @@ export default function AdminPage() {
                     <motion.span
                       layoutId="admin-tab"
                       className="absolute inset-0 rounded-full bg-gold"
-                      transition={{ type: "spring", stiffness: 360, damping: 32 }}
+                      transition={{
+                        type: "spring",
+                        stiffness: 360,
+                        damping: 32,
+                      }}
                     />
                   )}
                   <span
@@ -88,6 +94,16 @@ export default function AdminPage() {
           </nav>
 
           <div className="flex items-center gap-2">
+            {/* New Phone Order CTA */}
+            <button
+              onClick={() => setShowPhoneForm(true)}
+              className="inline-flex items-center gap-2 rounded-full bg-gold px-4 py-2 text-xs font-bold text-espresso shadow-md transition-all hover:scale-[1.02] hover:bg-gold-light active:scale-95"
+            >
+              <Phone size={14} />
+              <span className="hidden sm:inline">New Phone Order</span>
+              <span className="sm:hidden">+ Order</span>
+            </button>
+
             <Link
               href="/"
               className="hidden items-center gap-1 rounded-full border border-gold/30 px-3.5 py-2 text-xs font-medium text-cream/80 transition-colors hover:border-gold hover:text-gold sm:inline-flex"
@@ -119,6 +135,13 @@ export default function AdminPage() {
           <MenuManager />
         )}
       </main>
+
+      {/* Phone order form slide-in */}
+      <AnimatePresence>
+        {showPhoneForm && (
+          <PhoneOrderForm onClose={() => setShowPhoneForm(false)} />
+        )}
+      </AnimatePresence>
     </div>
   );
 }

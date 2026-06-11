@@ -1,4 +1,4 @@
-import type { MenuItem } from "@/lib/types";
+import type { MenuItem, Modifier } from "@/lib/types";
 
 // ---------------------------------------------------------------------------
 // FULL dinner menu scraped from https://www.kcanthonysongrand.com/dinner-menu/
@@ -6,28 +6,69 @@ import type { MenuItem } from "@/lib/types";
 // Anthony's OWN photography (public/images/menu/*). Three dishes without a
 // usable in-house photo (Lasagna, Tiramisu, Linguine w/ Clam Sauce) use
 // licensed Unsplash imagery; the rest render as engraved typographic cards.
+//
+// MODIFIERS — Phase 1 research (live site scrape 2026-06-10):
+//   Anthony's actual add-ons found on kcanthonysongrand.com/dinner-menu/:
+//     - Meatball +$4.50 | Sausage +$5.00 | Meat Sauce +$4.50 (sugo pastas)
+//     - Chicken +$6.50 (Jerri Jean pastas)
+//     - Chicken +$6.50 | Shrimp +$7.50 (Pasta Angela)
+//   Industry-standard additions (no other modifiers listed on site):
+//     - Extra Parmesan, GF Pasta sub, Side Marinara, prep flags
 // ---------------------------------------------------------------------------
 
-const PASTA_ADDONS_MEAT = [
-  { label: "Add Meatball", priceCents: 450 },
-  { label: "Add Sausage", priceCents: 500 },
-  { label: "Add Meat Sauce", priceCents: 450 },
-];
+// ── Modifier definitions ───────────────────────────────────────────────────
 
-const PASTA_ADDONS_PROTEIN = [
-  { label: "Add Meatball", priceCents: 450 },
-  { label: "Add Sausage", priceCents: 500 },
-  { label: "Add Chicken", priceCents: 650 },
-];
+const M: Record<string, Modifier> = {
+  // Add-ons confirmed from Anthony's website
+  ADD_MEATBALL:   { id: "add-meatball",   name: "Add Meatball",          priceCents: 450, category: "add-on" },
+  ADD_SAUSAGE:    { id: "add-sausage",    name: "Add Sausage",           priceCents: 500, category: "add-on" },
+  ADD_MEAT_SAUCE: { id: "add-meat-sauce", name: "Add Meat Sauce",        priceCents: 450, category: "add-on" },
+  ADD_CHICKEN:    { id: "add-chicken",    name: "Add Chicken",           priceCents: 650, category: "add-on" },
+  ADD_SHRIMP:     { id: "add-shrimp",     name: "Add Shrimp",            priceCents: 750, category: "add-on" },
+  // Industry-standard add-ons
+  EXTRA_PARM:     { id: "extra-parmesan", name: "Extra Parmesan",        priceCents: 200, category: "add-on" },
+  SIDE_MARINARA:  { id: "side-marinara",  name: "Side of Marinara",      priceCents: 300, category: "add-on" },
+  SIDE_BREAD:     { id: "side-bread",     name: "Side of Italian Bread", priceCents: 300, category: "add-on" },
+  // Substitution
+  GF_PASTA:       { id: "gf-pasta",       name: "Gluten-Free Pasta",     priceCents: 300, category: "substitution" },
+  // Preparation flags (free)
+  EXTRA_SAUCE:    { id: "extra-sauce",    name: "Extra Sauce",           priceCents: 0,   category: "preparation" },
+  LIGHT_SAUCE:    { id: "light-sauce",    name: "Light Sauce",           priceCents: 0,   category: "preparation" },
+  SAUCE_SIDE:     { id: "sauce-on-side",  name: "Sauce on the Side",     priceCents: 0,   category: "preparation" },
+  WELL_DONE:      { id: "well-done",      name: "Well Done",             priceCents: 0,   category: "preparation" },
+  DRESSING_SIDE:  { id: "dressing-side",  name: "Dressing on the Side",  priceCents: 0,   category: "preparation" },
+  NO_ONIONS:      { id: "no-onions",      name: "No Onions",             priceCents: 0,   category: "preparation" },
+};
+
+// ── Modifier bundles ───────────────────────────────────────────────────────
+// Base extras available on all pasta (industry standard)
+const PASTA_BASE  = [M.EXTRA_PARM, M.GF_PASTA, M.SAUCE_SIDE, M.EXTRA_SAUCE];
+
+// Sugo-based pastas: meatball / sausage / meat sauce confirmed on site
+const PASTA_SUGO    = [M.ADD_MEATBALL, M.ADD_SAUSAGE, M.ADD_MEAT_SAUCE, ...PASTA_BASE];
+// Jerri Jean pastas: meatball / sausage / chicken confirmed on site
+const PASTA_PROTEIN = [M.ADD_MEATBALL, M.ADD_SAUSAGE, M.ADD_CHICKEN,    ...PASTA_BASE];
+// Cream sauce pastas: chicken / shrimp confirmed on site (Pasta Angela)
+const PASTA_CREAM   = [M.ADD_CHICKEN, M.ADD_SHRIMP,                      ...PASTA_BASE];
+// Neutral pastas (no protein on site): just the base extras
+const PASTA_PLAIN   = [...PASTA_BASE];
+
+// Fried appetizers: extra dipping sauce
+const FRIED_APP = [M.SIDE_MARINARA, M.EXTRA_SAUCE];
+
+// Specialty entrées: sauce and cooking prep
+const SPECIALTY = [M.EXTRA_SAUCE, M.LIGHT_SAUCE, M.SAUCE_SIDE, M.WELL_DONE, M.SIDE_MARINARA];
+
+// ── Menu ──────────────────────────────────────────────────────────────────
 
 export const MENU: MenuItem[] = [
-  // ----------------------------- Appetizers -----------------------------
+  // ─────────────────────────── Appetizers ──────────────────────────────
+
   {
     id: "jazz",
     category: "Appetizers",
     name: "Jazz",
-    description:
-      "Fresh garlic, Romano cheese and herbs in olive oil. Great for dipping.",
+    description: "Fresh garlic, Romano cheese and herbs in olive oil. Great for dipping.",
     priceCents: 800,
     tags: ["vegetarian"],
     sortOrder: 1,
@@ -63,39 +104,43 @@ export const MENU: MenuItem[] = [
     id: "fried-provolone",
     category: "Appetizers",
     name: "Fried Provolone",
-    description:
-      "Hand-cut triangles covered in seasoned bread crumbs. Served with sugo.",
+    description: "Hand-cut triangles covered in seasoned bread crumbs. Served with sugo.",
     priceCents: 1400,
     tags: ["vegetarian"],
+    modifiers: FRIED_APP,
+    allowsSpecialRequests: true,
     sortOrder: 5,
   },
   {
     id: "toasted-ravioli",
     category: "Appetizers",
     name: "Toasted Ravioli",
-    description:
-      "Filled with ricotta cheese and deep-fried in seasoned bread crumbs. Served with sugo.",
+    description: "Filled with ricotta cheese and deep-fried in seasoned bread crumbs. Served with sugo.",
     priceCents: 1400,
     tags: ["vegetarian"],
+    modifiers: FRIED_APP,
+    allowsSpecialRequests: true,
     sortOrder: 6,
   },
   {
     id: "fried-calamari",
     category: "Appetizers",
     name: "Fried Calamari",
-    description:
-      "Served with sugo and home-made mogu, a olive oil, garlic and lemon sauce.",
+    description: "Served with sugo and home-made mogu, a olive oil, garlic and lemon sauce.",
     priceCents: 1700,
+    modifiers: FRIED_APP,
+    allowsSpecialRequests: true,
     sortOrder: 7,
   },
   {
     id: "stuffed-artichoke",
     category: "Appetizers",
     name: "Stuffed Artichoke",
-    description:
-      "A fresh baked artichoke baked with bread crumbs, topped with butter and garlic.",
+    description: "A fresh baked artichoke baked with bread crumbs, topped with butter and garlic.",
     priceCents: 1700,
     tags: ["vegetarian"],
+    modifiers: [M.EXTRA_SAUCE, M.LIGHT_SAUCE],
+    allowsSpecialRequests: true,
     sortOrder: 8,
   },
   {
@@ -108,28 +153,32 @@ export const MENU: MenuItem[] = [
     sortOrder: 9,
   },
 
-  // ---------------------------- Soup & Salad ----------------------------
+  // ─────────────────────────── Soup & Salad ────────────────────────────
+
   {
     id: "todays-soup",
     category: "Soup & Salad",
     name: "Today's Soup",
     description: "Made fresh daily. Served with bread and butter.",
     priceCents: 650,
+    allowsSpecialRequests: true,
     sortOrder: 1,
   },
   {
     id: "house-salad",
     category: "Soup & Salad",
     name: "House Salad",
-    description:
-      "Choice of house Italian or Ranch dressing. Served with bread and butter.",
+    description: "Choice of house Italian or Ranch dressing. Served with bread and butter.",
     priceCents: 650,
     image: "/images/menu/house-salad.jpg",
     tags: ["vegetarian"],
+    modifiers: [M.DRESSING_SIDE, M.EXTRA_PARM, M.SIDE_BREAD],
+    allowsSpecialRequests: true,
     sortOrder: 2,
   },
 
-  // ------------------------------- Pasta --------------------------------
+  // ─────────────────────────────── Pasta ───────────────────────────────
+
   {
     id: "linguini-with-sugo",
     category: "Pasta",
@@ -137,7 +186,8 @@ export const MENU: MenuItem[] = [
     description: "Linguine tossed in and topped with our homemade sugo.",
     priceCents: 1600,
     tags: ["vegan"],
-    addons: PASTA_ADDONS_MEAT,
+    modifiers: PASTA_SUGO,
+    allowsSpecialRequests: true,
     sortOrder: 1,
   },
   {
@@ -148,7 +198,8 @@ export const MENU: MenuItem[] = [
     priceCents: 1900,
     image: "/images/menu/lasagna.jpg",
     tags: ["vegetarian"],
-    addons: PASTA_ADDONS_MEAT,
+    modifiers: PASTA_SUGO,
+    allowsSpecialRequests: true,
     sortOrder: 2,
   },
   {
@@ -158,7 +209,8 @@ export const MENU: MenuItem[] = [
     description: "Filled with ricotta.",
     priceCents: 1800,
     tags: ["vegetarian"],
-    addons: PASTA_ADDONS_MEAT,
+    modifiers: PASTA_SUGO,
+    allowsSpecialRequests: true,
     sortOrder: 3,
   },
   {
@@ -170,7 +222,8 @@ export const MENU: MenuItem[] = [
     priceCents: 2200,
     image: "/images/menu/ravioli-jerri-jean.jpg",
     tags: ["vegetarian"],
-    addons: PASTA_ADDONS_PROTEIN,
+    modifiers: PASTA_PROTEIN,
+    allowsSpecialRequests: true,
     sortOrder: 4,
   },
   {
@@ -180,20 +233,19 @@ export const MENU: MenuItem[] = [
     description: "Linguini sauteed with olive oil, garlic, butter and spices.",
     priceCents: 1900,
     tags: ["vegetarian"],
+    modifiers: [M.ADD_CHICKEN, M.ADD_SHRIMP, ...PASTA_BASE],
+    allowsSpecialRequests: true,
     sortOrder: 5,
   },
   {
     id: "pasta-angela",
     category: "Pasta",
     name: "Pasta Angela",
-    description:
-      "Linguine pasta sautéed in a Parmesan cheese, butter and garlic cream sauce.",
+    description: "Linguine pasta sautéed in a Parmesan cheese, butter and garlic cream sauce.",
     priceCents: 2000,
     tags: ["vegetarian"],
-    addons: [
-      { label: "Add Chicken", priceCents: 650 },
-      { label: "Add Shrimp", priceCents: 750 },
-    ],
+    modifiers: PASTA_CREAM,
+    allowsSpecialRequests: true,
     sortOrder: 6,
   },
   {
@@ -204,6 +256,8 @@ export const MENU: MenuItem[] = [
     priceCents: 2000,
     image: "/images/menu/pasta-fungi-piselli.jpg",
     tags: ["vegan"],
+    modifiers: [M.ADD_CHICKEN, ...PASTA_BASE],
+    allowsSpecialRequests: true,
     sortOrder: 7,
   },
   {
@@ -213,6 +267,8 @@ export const MENU: MenuItem[] = [
     description: "Chopped clams sauteed in olive oil, butter and garlic.",
     priceCents: 2200,
     image: "/images/menu/linguine-clam.jpg",
+    modifiers: PASTA_PLAIN,
+    allowsSpecialRequests: true,
     sortOrder: 8,
   },
   {
@@ -224,6 +280,8 @@ export const MENU: MenuItem[] = [
     priceCents: 2400,
     image: "/images/menu/pasta-con-broccoli.jpg",
     tags: ["vegetarian"],
+    modifiers: PASTA_CREAM,
+    allowsSpecialRequests: true,
     sortOrder: 9,
   },
   {
@@ -235,7 +293,8 @@ export const MENU: MenuItem[] = [
     priceCents: 2000,
     image: "/images/menu/pasta-jerri-jean.jpg",
     tags: ["vegetarian"],
-    addons: PASTA_ADDONS_PROTEIN,
+    modifiers: PASTA_PROTEIN,
+    allowsSpecialRequests: true,
     featured: true,
     sortOrder: 10,
   },
@@ -247,6 +306,8 @@ export const MENU: MenuItem[] = [
       "Shrimp, calamari, chopped clams, mushrooms, and crushed tomatoes sauteed with fresh garlic, butter and a pinch of red pepper poured over linguini pasta.",
     priceCents: 2900,
     image: "/images/menu/pasta-puttanesca.jpg",
+    modifiers: PASTA_PLAIN,
+    allowsSpecialRequests: true,
     sortOrder: 11,
   },
   {
@@ -257,10 +318,13 @@ export const MENU: MenuItem[] = [
       "Linguini sauteed with fresh tomatoes, white wine, garlic, onions and Italian herbs & spices.",
     priceCents: 2000,
     tags: ["vegan"],
+    modifiers: [M.ADD_CHICKEN, M.ADD_SHRIMP, M.ADD_MEATBALL, M.NO_ONIONS, ...PASTA_BASE],
+    allowsSpecialRequests: true,
     sortOrder: 12,
   },
 
-  // ----------------------------- Specialties ----------------------------
+  // ────────────────────────── Specialties ──────────────────────────────
+
   {
     id: "eggplant-parmesan",
     category: "Specialties",
@@ -269,24 +333,28 @@ export const MENU: MenuItem[] = [
       "Breaded slices of fresh eggplant topped with sugo, grated Parmesan and melted mozzarella.",
     priceCents: 1950,
     tags: ["vegetarian"],
+    modifiers: SPECIALTY,
+    allowsSpecialRequests: true,
     sortOrder: 1,
   },
   {
     id: "chicken-parmesan",
     category: "Specialties",
     name: "Chicken Parmesan",
-    description:
-      "Breaded chicken breast topped with sugo, grated Parmesan and melted mozzarella.",
+    description: "Breaded chicken breast topped with sugo, grated Parmesan and melted mozzarella.",
     priceCents: 2150,
+    modifiers: SPECIALTY,
+    allowsSpecialRequests: true,
     sortOrder: 2,
   },
   {
     id: "veal-parmesan",
     category: "Specialties",
     name: "Veal Parmesan",
-    description:
-      "Breaded veal topped with sugo, grated Parmesan and melted mozzarella.",
+    description: "Breaded veal topped with sugo, grated Parmesan and melted mozzarella.",
     priceCents: 2450,
+    modifiers: SPECIALTY,
+    allowsSpecialRequests: true,
     sortOrder: 3,
   },
   {
@@ -296,6 +364,8 @@ export const MENU: MenuItem[] = [
     description:
       "Breaded chicken breast topped with broccoli and fresh mushrooms, served in a white wine, butter and garlic sauce.",
     priceCents: 2250,
+    modifiers: [M.EXTRA_SAUCE, M.LIGHT_SAUCE, M.SAUCE_SIDE, M.WELL_DONE],
+    allowsSpecialRequests: true,
     sortOrder: 4,
   },
   {
@@ -306,6 +376,8 @@ export const MENU: MenuItem[] = [
       "Four large pieces of chicken breast tenders coated in our seasoned breadcrumbs, rolled and deep-fried on a skewer, then cooked in our garlic-lemon and olive oil sauce.",
     priceCents: 2550,
     image: "/images/menu/chicken-spiedini.jpg",
+    modifiers: [M.EXTRA_SAUCE, M.LIGHT_SAUCE, M.SAUCE_SIDE, M.WELL_DONE],
+    allowsSpecialRequests: true,
     featured: true,
     sortOrder: 5,
   },
@@ -313,32 +385,36 @@ export const MENU: MenuItem[] = [
     id: "pollo-parmesan",
     category: "Specialties",
     name: "Pollo Parmesan",
-    description:
-      "Breaded chicken breast topped with melted mozzarella, sugo and parmesan cheese.",
+    description: "Breaded chicken breast topped with melted mozzarella, sugo and parmesan cheese.",
     priceCents: 2150,
+    modifiers: SPECIALTY,
+    allowsSpecialRequests: true,
     sortOrder: 6,
   },
   {
     id: "chicken-lemonata",
     category: "Specialties",
     name: "Chicken Lemonata",
-    description:
-      "Two grilled chicken breasts, topped with a white wine, lemon and butter sauce.",
+    description: "Two grilled chicken breasts, topped with a white wine, lemon and butter sauce.",
     priceCents: 2650,
     image: "/images/menu/chicken-lemonata.jpg",
+    modifiers: [M.EXTRA_SAUCE, M.LIGHT_SAUCE, M.SAUCE_SIDE, M.WELL_DONE],
+    allowsSpecialRequests: true,
     sortOrder: 7,
   },
   {
     id: "scampi-spino",
     category: "Specialties",
     name: "Scampi Spino",
-    description:
-      "Eight shrimp lightly breaded and broiled, served in a garlic, butter and lemon sauce.",
+    description: "Eight shrimp lightly breaded and broiled, served in a garlic, butter and lemon sauce.",
     priceCents: 2750,
+    modifiers: [M.EXTRA_SAUCE, M.LIGHT_SAUCE, M.SAUCE_SIDE, M.WELL_DONE],
+    allowsSpecialRequests: true,
     sortOrder: 8,
   },
 
-  // ------------------------------ Desserts ------------------------------
+  // ─────────────────────────── Desserts ────────────────────────────────
+
   {
     id: "cheesecake",
     category: "Desserts",

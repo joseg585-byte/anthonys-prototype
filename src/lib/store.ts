@@ -2,7 +2,7 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { CartLine, MenuItem, MenuAddon } from "./types";
+import type { CartLine, CartModifier, MenuItem } from "./types";
 
 interface CartState {
   lines: CartLine[];
@@ -10,16 +10,15 @@ interface CartState {
   open: () => void;
   close: () => void;
   toggle: () => void;
-  add: (item: MenuItem, addon?: MenuAddon, qty?: number) => void;
+  add: (item: MenuItem, modifiers: CartModifier[], specialRequests?: string, qty?: number) => void;
   setQty: (key: string, qty: number) => void;
   remove: (key: string) => void;
   clear: () => void;
 }
 
-// A cart line is keyed by item + chosen add-on so "Lasagna" and
-// "Lasagna + Sausage" stack independently.
-export function lineKey(itemId: string, addonLabel?: string): string {
-  return addonLabel ? `${itemId}::${addonLabel}` : itemId;
+export function lineKey(itemId: string, modifiers: CartModifier[]): string {
+  if (!modifiers.length) return itemId;
+  return `${itemId}::${modifiers.map((m) => m.id).sort().join(",")}`;
 }
 
 export const useCart = create<CartState>()(
@@ -30,27 +29,27 @@ export const useCart = create<CartState>()(
       open: () => set({ isOpen: true }),
       close: () => set({ isOpen: false }),
       toggle: () => set((s) => ({ isOpen: !s.isOpen })),
-      add: (item, addon, qty = 1) =>
+      add: (item, modifiers, specialRequests, qty = 1) =>
         set((s) => {
-          const key = lineKey(item.id, addon?.label);
-          const existing = s.lines.find(
-            (l) => lineKey(l.itemId, l.addonLabel) === key,
-          );
+          const key = lineKey(item.id, modifiers);
+          const existing = s.lines.find((l) => l.key === key);
           if (existing) {
             return {
               isOpen: true,
               lines: s.lines.map((l) =>
-                lineKey(l.itemId, l.addonLabel) === key
-                  ? { ...l, qty: l.qty + qty }
-                  : l,
+                l.key === key ? { ...l, qty: l.qty + qty } : l,
               ),
             };
           }
+          const modSum = modifiers.reduce((n, m) => n + m.priceCents, 0);
           const newLine: CartLine = {
+            key,
             itemId: item.id,
             name: item.name,
-            priceCents: item.priceCents + (addon?.priceCents ?? 0),
-            addonLabel: addon?.label,
+            basePriceCents: item.priceCents,
+            priceCents: item.priceCents + modSum,
+            modifiers,
+            specialRequests: specialRequests || undefined,
             qty,
             image: item.image,
           };
@@ -59,22 +58,16 @@ export const useCart = create<CartState>()(
       setQty: (key, qty) =>
         set((s) => ({
           lines: s.lines
-            .map((l) =>
-              lineKey(l.itemId, l.addonLabel) === key
-                ? { ...l, qty: Math.max(0, qty) }
-                : l,
-            )
+            .map((l) => (l.key === key ? { ...l, qty: Math.max(0, qty) } : l))
             .filter((l) => l.qty > 0),
         })),
       remove: (key) =>
-        set((s) => ({
-          lines: s.lines.filter(
-            (l) => lineKey(l.itemId, l.addonLabel) !== key,
-          ),
-        })),
+        set((s) => ({ lines: s.lines.filter((l) => l.key !== key) })),
       clear: () => set({ lines: [] }),
     }),
-    { name: "anthonys-cart" },
+    {
+      name: "anthonys-cart-v2",
+    },
   ),
 );
 

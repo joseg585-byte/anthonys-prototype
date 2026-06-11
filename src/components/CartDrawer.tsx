@@ -11,7 +11,7 @@ import {
   Check,
   Trash2,
 } from "lucide-react";
-import { useCart, cartSubtotal, lineKey, cartCount } from "@/lib/store";
+import { useCart, cartSubtotal, cartCount } from "@/lib/store";
 import { useOrders } from "@/lib/orders";
 import { useHasMounted } from "@/lib/useHasMounted";
 import { formatPrice } from "@/lib/format";
@@ -89,6 +89,9 @@ export function CartDrawer() {
       phone: form.phone.trim(),
       lines,
       subtotalCents: subtotal,
+      source: "online",
+      orderType: "pickup",
+      paymentMethod: "paid-online",
     });
     setPlaced(order);
     clear();
@@ -97,7 +100,6 @@ export function CartDrawer() {
 
   const resetAndClose = () => {
     close();
-    // delay reset so the closing animation isn't janky
     setTimeout(() => {
       setStep("cart");
       setForm({ firstName: "", lastName: "", email: "", phone: "" });
@@ -107,7 +109,12 @@ export function CartDrawer() {
     }, 350);
   };
 
-  const field = (name: keyof FormState, label: string, type = "text", placeholder = "") => {
+  const field = (
+    name: keyof FormState,
+    label: string,
+    type = "text",
+    placeholder = "",
+  ) => {
     const showErr = (touched[name] || submitted) && errors[name];
     return (
       <label className="block">
@@ -214,61 +221,77 @@ export function CartDrawer() {
                 ) : (
                   <>
                     <ul className="flex-1 divide-y divide-gold/12 px-5">
-                      {lines.map((l) => {
-                        const key = lineKey(l.itemId, l.addonLabel);
-                        return (
-                          <li key={key} className="flex gap-3 py-4">
-                            <div className="min-w-0 flex-1">
-                              <p className="font-display text-base font-semibold text-espresso">
-                                {l.name}
+                      {lines.map((l) => (
+                        <li key={l.key} className="flex gap-3 py-4">
+                          <div className="min-w-0 flex-1">
+                            <p className="font-display text-base font-semibold text-espresso">
+                              {l.name}
+                            </p>
+                            {/* Selected modifiers */}
+                            {l.modifiers.length > 0 && (
+                              <ul className="mt-0.5 space-y-0.5">
+                                {l.modifiers.map((m) => (
+                                  <li
+                                    key={m.id}
+                                    className="flex items-baseline justify-between gap-2 text-xs text-gold-deep"
+                                  >
+                                    <span>+ {m.name}</span>
+                                    {m.priceCents > 0 && (
+                                      <span className="shrink-0">
+                                        +{formatPrice(m.priceCents)}
+                                      </span>
+                                    )}
+                                  </li>
+                                ))}
+                              </ul>
+                            )}
+                            {/* Special requests */}
+                            {l.specialRequests && (
+                              <p className="mt-1 text-xs italic text-espresso-soft/60">
+                                &ldquo;{l.specialRequests}&rdquo;
                               </p>
-                              {l.addonLabel && (
-                                <p className="text-xs text-gold-deep">
-                                  {l.addonLabel}
-                                </p>
-                              )}
-                              <p className="mt-0.5 text-sm text-espresso-soft/70">
-                                {formatPrice(l.priceCents)} each
-                              </p>
-                              <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-gold/30 bg-cream">
-                                <button
-                                  onClick={() => setQty(key, l.qty - 1)}
-                                  aria-label="Decrease quantity"
-                                  className="grid h-7 w-7 place-items-center rounded-full text-espresso-soft transition-colors hover:text-crimson"
-                                >
-                                  {l.qty === 1 ? (
-                                    <Trash2 size={13} />
-                                  ) : (
-                                    <Minus size={13} />
-                                  )}
-                                </button>
-                                <span className="w-5 text-center text-sm font-semibold text-espresso">
-                                  {l.qty}
-                                </span>
-                                <button
-                                  onClick={() => setQty(key, l.qty + 1)}
-                                  aria-label="Increase quantity"
-                                  className="grid h-7 w-7 place-items-center rounded-full text-espresso-soft transition-colors hover:text-crimson"
-                                >
-                                  <Plus size={13} />
-                                </button>
-                              </div>
-                            </div>
-                            <div className="flex flex-col items-end justify-between">
+                            )}
+                            <p className="mt-1 text-sm text-espresso-soft/70">
+                              {formatPrice(l.priceCents)} each
+                            </p>
+                            <div className="mt-2 inline-flex items-center gap-1 rounded-full border border-gold/30 bg-cream">
                               <button
-                                onClick={() => remove(key)}
-                                aria-label={`Remove ${l.name}`}
-                                className="text-espresso-soft/40 transition-colors hover:text-crimson"
+                                onClick={() => setQty(l.key, l.qty - 1)}
+                                aria-label="Decrease quantity"
+                                className="grid h-7 w-7 place-items-center rounded-full text-espresso-soft transition-colors hover:text-crimson"
                               >
-                                <X size={16} />
+                                {l.qty === 1 ? (
+                                  <Trash2 size={13} />
+                                ) : (
+                                  <Minus size={13} />
+                                )}
                               </button>
-                              <span className="font-display text-base font-semibold text-espresso">
-                                {formatPrice(l.priceCents * l.qty)}
+                              <span className="w-5 text-center text-sm font-semibold text-espresso">
+                                {l.qty}
                               </span>
+                              <button
+                                onClick={() => setQty(l.key, l.qty + 1)}
+                                aria-label="Increase quantity"
+                                className="grid h-7 w-7 place-items-center rounded-full text-espresso-soft transition-colors hover:text-crimson"
+                              >
+                                <Plus size={13} />
+                              </button>
                             </div>
-                          </li>
-                        );
-                      })}
+                          </div>
+                          <div className="flex flex-col items-end justify-between">
+                            <button
+                              onClick={() => remove(l.key)}
+                              aria-label={`Remove ${l.name}`}
+                              className="text-espresso-soft/40 transition-colors hover:text-crimson"
+                            >
+                              <X size={16} />
+                            </button>
+                            <span className="font-display text-base font-semibold text-espresso">
+                              {formatPrice(l.priceCents * l.qty)}
+                            </span>
+                          </div>
+                        </li>
+                      ))}
                     </ul>
                     <CartFooter
                       subtotal={subtotal}
@@ -303,12 +326,11 @@ export function CartDrawer() {
                     </p>
                     <ul className="space-y-1 text-sm text-espresso-soft/80">
                       {lines.map((l) => (
-                        <li
-                          key={lineKey(l.itemId, l.addonLabel)}
-                          className="flex justify-between gap-2"
-                        >
+                        <li key={l.key} className="flex justify-between gap-2">
                           <span className="truncate">
                             {l.qty}× {l.name}
+                            {l.modifiers.length > 0 &&
+                              ` · ${l.modifiers.map((m) => m.name).join(", ")}`}
                           </span>
                           <span>{formatPrice(l.priceCents * l.qty)}</span>
                         </li>
@@ -336,7 +358,12 @@ export function CartDrawer() {
                 <motion.span
                   initial={{ scale: 0 }}
                   animate={{ scale: 1 }}
-                  transition={{ type: "spring", stiffness: 260, damping: 16, delay: 0.1 }}
+                  transition={{
+                    type: "spring",
+                    stiffness: 260,
+                    damping: 16,
+                    delay: 0.1,
+                  }}
                   className="grid h-20 w-20 place-items-center rounded-full bg-basil text-cream"
                 >
                   <Check size={40} strokeWidth={2.5} />
@@ -346,9 +373,7 @@ export function CartDrawer() {
                 </h3>
                 <p className="mt-2 max-w-xs text-sm text-espresso-soft/75">
                   Your order is in the kitchen. We&rsquo;ll text{" "}
-                  <span className="font-medium text-espresso">
-                    {placed.phone}
-                  </span>{" "}
+                  <span className="font-medium text-espresso">{placed.phone}</span>{" "}
                   when it&rsquo;s ready for pickup.
                 </p>
 
@@ -359,14 +384,26 @@ export function CartDrawer() {
                   <p className="mt-1 font-display text-4xl font-bold tracking-wide text-crimson">
                     {placed.shortCode}
                   </p>
-                  <div className="mt-4 space-y-1 border-t border-gold/15 pt-4 text-left text-sm text-espresso-soft/80">
+                  <div className="mt-4 space-y-1.5 border-t border-gold/15 pt-4 text-left text-sm text-espresso-soft/80">
                     {placed.items.map((it, i) => (
-                      <div key={i} className="flex justify-between gap-2">
-                        <span className="truncate">
-                          {it.qty}× {it.name}
-                          {it.addonLabel ? ` · ${it.addonLabel}` : ""}
-                        </span>
-                        <span>{formatPrice(it.priceCents * it.qty)}</span>
+                      <div key={i}>
+                        <div className="flex justify-between gap-2">
+                          <span className="truncate">
+                            {it.qty}× {it.name}
+                          </span>
+                          <span>{formatPrice(it.priceCents * it.qty)}</span>
+                        </div>
+                        {it.modifiers.map((m) => (
+                          <div
+                            key={m.id}
+                            className="ml-4 flex justify-between gap-2 text-xs text-gold-deep/80"
+                          >
+                            <span>+ {m.name}</span>
+                            {m.priceCents > 0 && (
+                              <span>+{formatPrice(m.priceCents)}</span>
+                            )}
+                          </div>
+                        ))}
                       </div>
                     ))}
                     <div className="flex justify-between border-t border-gold/15 pt-2 font-display text-base font-semibold text-espresso">

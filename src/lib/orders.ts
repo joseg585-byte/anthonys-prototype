@@ -2,7 +2,14 @@
 
 import { create } from "zustand";
 import { persist } from "zustand/middleware";
-import type { Order, OrderStatus, CartLine } from "./types";
+import type {
+  Order,
+  OrderStatus,
+  OrderSource,
+  PaymentMethod,
+  CartLine,
+  CartModifier,
+} from "./types";
 import { RESTAURANT } from "@/data/restaurant";
 import { broadcast, onBroadcast } from "./realtime";
 
@@ -14,6 +21,12 @@ interface NewOrderInput {
   notes?: string;
   lines: CartLine[];
   subtotalCents: number;
+  source?: OrderSource;
+  orderType?: "pickup" | "delivery";
+  deliveryAddress?: string;
+  pickupTime?: string;
+  paymentMethod?: PaymentMethod;
+  tipCents?: number;
 }
 
 interface OrdersState {
@@ -45,7 +58,10 @@ function ticketCode(seq: number): string {
   return `A-${String(200 + seq).padStart(3, "0")}`;
 }
 
-// A few in-flight tickets so the kitchen display looks alive on first open.
+function noMods(): CartModifier[] {
+  return [];
+}
+
 function demoOrders(): Order[] {
   const now = Date.now();
   const mk = (
@@ -54,7 +70,10 @@ function demoOrders(): Order[] {
     status: OrderStatus,
     first: string,
     last: string,
+    source: OrderSource,
+    paymentMethod: PaymentMethod,
     items: Order["items"],
+    notes?: string,
   ): Order => {
     const subtotal = items.reduce((n, i) => n + i.priceCents * i.qty, 0);
     const tax = Math.round(subtotal * RESTAURANT.taxRate);
@@ -63,6 +82,7 @@ function demoOrders(): Order[] {
       shortCode: ticketCode(seq),
       restaurantSlug: RESTAURANT.slug,
       status,
+      source,
       customerFirstName: first,
       customerLastName: last,
       email: `${first.toLowerCase()}@example.com`,
@@ -70,24 +90,43 @@ function demoOrders(): Order[] {
       items,
       subtotalCents: subtotal,
       taxCents: tax,
+      tipCents: 0,
       totalCents: subtotal + tax,
+      notes,
+      orderType: "pickup",
+      paymentMethod,
       createdAt: now - minsAgo * 60_000,
     };
   };
+
   return [
-    mk(1, 11, "preparing", "Maria", "Russo", [
-      { name: "Chicken Spiedini", qty: 1, priceCents: 2550 },
-      { name: "Pasta Jerri Jean", qty: 1, priceCents: 2000, addonLabel: "Add Chicken" },
-      { name: "Tiramisu", qty: 2, priceCents: 750 },
+    mk(1, 11, "preparing", "Maria", "Russo", "online", "paid-online", [
+      { name: "Chicken Spiedini", qty: 1, priceCents: 2550, modifiers: noMods() },
+      {
+        name: "Pasta Jerri Jean",
+        qty: 1,
+        priceCents: 2650,
+        modifiers: [{ id: "add-chicken", name: "Add Chicken", priceCents: 650 }],
+        specialRequests: "extra sauce please",
+      },
+      { name: "Tiramisu", qty: 2, priceCents: 750, modifiers: noMods() },
     ]),
-    mk(2, 4, "received", "David", "Klein", [
-      { name: "Lasagna", qty: 1, priceCents: 1900, addonLabel: "Add Sausage" },
-      { name: "House Salad", qty: 1, priceCents: 650 },
-    ]),
-    mk(3, 1, "received", "Theresa", "Marino", [
-      { name: "Pasta Puttanesca", qty: 1, priceCents: 2900 },
-      { name: "Linguine with Clam Sauce", qty: 1, priceCents: 2200 },
-      { name: "Cannoli (2)", qty: 1, priceCents: 750 },
+    mk(2, 4, "received", "David", "Klein", "phone", "card-on-pickup", [
+      {
+        name: "Lasagna",
+        qty: 1,
+        priceCents: 2400,
+        modifiers: [
+          { id: "add-sausage", name: "Add Sausage", priceCents: 500 },
+        ],
+      },
+      { name: "House Salad", qty: 1, priceCents: 650, modifiers: noMods() },
+    ],
+    "No garlic on the salad — allergic"),
+    mk(3, 1, "received", "Theresa", "Marino", "online", "paid-online", [
+      { name: "Pasta Puttanesca", qty: 1, priceCents: 2900, modifiers: noMods() },
+      { name: "Linguine with Clam Sauce", qty: 1, priceCents: 2200, modifiers: noMods() },
+      { name: "Cannoli (2)", qty: 1, priceCents: 750, modifiers: noMods() },
     ]),
   ];
 }
@@ -99,8 +138,6 @@ export const useOrders = create<OrdersState>()(
       seeded: false,
       ticketSeq: 3,
       seedIfEmpty: () => {
-        // Only populate demo tickets on a truly empty board — never clobber
-        // real orders a guest may have already placed.
         if (get().seeded || get().orders.length > 0) return;
         set({ orders: demoOrders(), seeded: true, ticketSeq: 3 });
       },
@@ -110,14 +147,17 @@ export const useOrders = create<OrdersState>()(
           name: l.name,
           qty: l.qty,
           priceCents: l.priceCents,
-          addonLabel: l.addonLabel,
+          modifiers: l.modifiers,
+          specialRequests: l.specialRequests,
         }));
+        const tip = input.tipCents ?? 0;
         const tax = Math.round(input.subtotalCents * RESTAURANT.taxRate);
         const order: Order = {
           id: `ord-${Date.now()}-${Math.random().toString(36).slice(2, 7)}`,
           shortCode: ticketCode(seq),
           restaurantSlug: RESTAURANT.slug,
           status: "received",
+          source: input.source ?? "online",
           customerFirstName: input.firstName,
           customerLastName: input.lastName,
           email: input.email,
@@ -126,7 +166,12 @@ export const useOrders = create<OrdersState>()(
           items,
           subtotalCents: input.subtotalCents,
           taxCents: tax,
-          totalCents: input.subtotalCents + tax,
+          tipCents: tip,
+          totalCents: input.subtotalCents + tax + tip,
+          orderType: input.orderType ?? "pickup",
+          deliveryAddress: input.deliveryAddress,
+          pickupTime: input.pickupTime,
+          paymentMethod: input.paymentMethod ?? "paid-online",
           createdAt: Date.now(),
         };
         const orders = [order, ...get().orders];
@@ -154,7 +199,7 @@ export const useOrders = create<OrdersState>()(
         isApplyingRemote = false;
       },
     }),
-    { name: "anthonys-orders" },
+    { name: "anthonys-orders-v2" },
   ),
 );
 
@@ -169,13 +214,9 @@ if (typeof window !== "undefined") {
 
 export function statusLabel(s: OrderStatus): string {
   switch (s) {
-    case "received":
-      return "New";
-    case "preparing":
-      return "In the Kitchen";
-    case "ready":
-      return "Ready for Pickup";
-    case "completed":
-      return "Completed";
+    case "received":  return "New";
+    case "preparing": return "In the Kitchen";
+    case "ready":     return "Ready for Pickup";
+    case "completed": return "Completed";
   }
 }

@@ -2,7 +2,14 @@
 
 import { useEffect, useRef, useState } from "react";
 import { AnimatePresence, motion } from "framer-motion";
-import { Clock, ChevronRight, Volume2, VolumeX, CheckCircle2 } from "lucide-react";
+import {
+  Clock,
+  ChevronRight,
+  Volume2,
+  VolumeX,
+  CheckCircle2,
+  Phone,
+} from "lucide-react";
 import { useOrders, statusLabel } from "@/lib/orders";
 import type { Order, OrderStatus } from "@/lib/types";
 import { formatPrice, timeAgo, clockTime } from "@/lib/format";
@@ -20,6 +27,37 @@ const ADVANCE_LABEL: Record<OrderStatus, string> = {
   completed: "Done",
 };
 
+function SourceBadge({ source }: { source: Order["source"] }) {
+  if (source === "phone") {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-full bg-gold/20 px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-widest text-gold">
+        <Phone size={9} />
+        PHONE
+      </span>
+    );
+  }
+  return (
+    <span className="rounded-full bg-blue-500/20 px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-widest text-blue-300">
+      ONLINE
+    </span>
+  );
+}
+
+function PaymentBadge({ method }: { method: Order["paymentMethod"] }) {
+  const isPaid = method === "paid-online";
+  return (
+    <span
+      className={`rounded-full px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-widest ${
+        isPaid
+          ? "bg-basil/25 text-basil"
+          : "bg-gold/15 text-gold-deep"
+      }`}
+    >
+      {isPaid ? "✓ PAID" : "PAY ON PICKUP"}
+    </span>
+  );
+}
+
 function OrderCard({
   order,
   isNew,
@@ -30,6 +68,11 @@ function OrderCard({
   onAdvance: (id: string) => void;
 }) {
   const lane = LANES.find((l) => l.status === order.status);
+
+  // Safe fallbacks for demo orders that may predate the new fields
+  const source = order.source ?? "online";
+  const paymentMethod = order.paymentMethod ?? "paid-online";
+
   return (
     <motion.article
       layout
@@ -41,41 +84,98 @@ function OrderCard({
         lane?.accent
       } ${isNew ? "pulse-ring" : ""}`}
     >
-      <div className="flex items-start justify-between">
-        <div>
+      {/* ── Card header ── */}
+      <div className="flex items-start justify-between gap-2">
+        <div className="min-w-0">
           <p className="font-display text-2xl font-bold leading-none text-gold">
             {order.shortCode}
           </p>
           <p className="mt-1 text-sm font-medium text-cream/90">
             {order.customerFirstName} {order.customerLastName}
           </p>
+          {source === "phone" && (
+            <p className="mt-0.5 text-xs text-cream/50">{order.phone}</p>
+          )}
         </div>
-        <div className="text-right text-xs text-cream/55">
-          <p className="flex items-center justify-end gap-1">
-            <Clock size={11} /> {clockTime(order.createdAt)}
-          </p>
-          <p className="mt-0.5">{timeAgo(order.createdAt)}</p>
+        <div className="flex flex-col items-end gap-1.5">
+          <div className="text-right text-xs text-cream/55">
+            <p className="flex items-center justify-end gap-1">
+              <Clock size={11} /> {clockTime(order.createdAt)}
+            </p>
+            <p className="mt-0.5">{timeAgo(order.createdAt)}</p>
+          </div>
+          <div className="flex flex-wrap justify-end gap-1">
+            <SourceBadge source={source} />
+            <PaymentBadge method={paymentMethod} />
+          </div>
         </div>
       </div>
 
-      <ul className="my-3 space-y-1.5 border-y border-gold/10 py-3">
+      {/* ── Line items ── */}
+      <ul className="my-3 space-y-2 border-y border-gold/10 py-3">
         {order.items.map((it, i) => (
-          <li key={i} className="flex items-baseline gap-2 text-sm">
-            <span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-crimson/25 text-xs font-bold text-cream">
-              {it.qty}
-            </span>
-            <span className="flex-1 text-cream/90">
-              {it.name}
-              {it.addonLabel && (
-                <span className="block text-xs text-gold/80">
-                  + {it.addonLabel}
-                </span>
-              )}
-            </span>
+          <li key={i} className="text-sm">
+            <div className="flex items-baseline gap-2">
+              <span className="grid h-5 w-5 shrink-0 place-items-center rounded bg-crimson/25 text-xs font-bold text-cream">
+                {it.qty}
+              </span>
+              <span className="flex-1 font-medium text-cream/90">{it.name}</span>
+            </div>
+
+            {/* Modifiers — red italic for kitchen visibility */}
+            {(it.modifiers ?? []).length > 0 && (
+              <ul className="ml-7 mt-0.5 space-y-0.5">
+                {it.modifiers.map((m) => (
+                  <li
+                    key={m.id}
+                    className="text-xs font-medium italic text-crimson/90"
+                  >
+                    + {m.name}
+                    {m.priceCents > 0 && (
+                      <span className="ml-1 not-italic text-cream/40">
+                        (+{formatPrice(m.priceCents)})
+                      </span>
+                    )}
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            {/* Per-item special request */}
+            {it.specialRequests && (
+              <p className="ml-7 mt-0.5 text-xs italic text-crimson/80">
+                &ldquo;{it.specialRequests}&rdquo;
+              </p>
+            )}
           </li>
         ))}
       </ul>
 
+      {/* ── Whole-order notes callout ── */}
+      {order.notes && (
+        <div className="mb-3 rounded-md border border-gold/25 bg-gold/10 px-3 py-2">
+          <p className="text-xs font-semibold uppercase tracking-wide text-gold/80">
+            Order note
+          </p>
+          <p className="mt-0.5 text-xs text-cream/80">{order.notes}</p>
+        </div>
+      )}
+
+      {/* ── Pickup / delivery info ── */}
+      {(order.orderType === "delivery" || order.pickupTime) && (
+        <div className="mb-3 text-xs text-cream/50">
+          {order.orderType === "delivery" ? (
+            <span>
+              Delivery
+              {order.deliveryAddress && ` → ${order.deliveryAddress}`}
+            </span>
+          ) : (
+            order.pickupTime && <span>Pickup: {order.pickupTime}</span>
+          )}
+        </div>
+      )}
+
+      {/* ── Footer ── */}
       <div className="flex items-center justify-between">
         <span className="text-xs text-cream/50">
           {formatPrice(order.totalCents)}
@@ -118,11 +218,11 @@ export function KDS({
     return () => clearInterval(t);
   }, []);
 
-  // detect newly arrived orders -> chime + highlight
+  // detect newly arrived orders → chime + highlight
   useEffect(() => {
     const currentIds = new Set(orders.map((o) => o.id));
     if (knownIds.current === null) {
-      knownIds.current = currentIds; // first paint: don't chime for seed data
+      knownIds.current = currentIds;
       return;
     }
     const fresh = orders.filter(
@@ -161,7 +261,8 @@ export function KDS({
             Kitchen Display
           </h2>
           <p className="text-sm text-cream/55">
-            {active.length} active ticket{active.length === 1 ? "" : "s"} · live
+            {active.length} active ticket{active.length === 1 ? "" : "s"} ·
+            live
           </p>
         </div>
         <button
