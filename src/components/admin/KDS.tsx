@@ -43,6 +43,14 @@ function SourceBadge({ source }: { source: Order["source"] }) {
   );
 }
 
+function DeliveryBadge() {
+  return (
+    <span className="inline-flex items-center gap-1 rounded-full bg-violet-500/20 px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-widest text-violet-300">
+      🚗 DELIVERY
+    </span>
+  );
+}
+
 function PaymentBadge({ method }: { method: Order["paymentMethod"] }) {
   const isPaid = method === "paid-online";
   return (
@@ -107,6 +115,7 @@ function OrderCard({
           <div className="flex flex-wrap justify-end gap-1">
             <SourceBadge source={source} />
             <PaymentBadge method={paymentMethod} />
+            {order.orderType === "delivery" && <DeliveryBadge />}
           </div>
         </div>
       </div>
@@ -184,7 +193,9 @@ function OrderCard({
           onClick={() => onAdvance(order.id)}
           className="inline-flex items-center gap-1 rounded-full bg-gold px-3.5 py-1.5 text-xs font-bold text-espresso transition-all hover:bg-gold-light active:scale-95"
         >
-          {ADVANCE_LABEL[order.status]}
+          {order.status === "ready" && order.orderType === "delivery"
+            ? "Driver Arrived"
+            : ADVANCE_LABEL[order.status]}
           <ChevronRight size={14} />
         </button>
       </div>

@@ -3,14 +3,16 @@
 import { useEffect, useState } from "react";
 import Link from "next/link";
 import { AnimatePresence, motion } from "framer-motion";
-import { MonitorPlay, ListChecks, ArrowUpRight, LogOut, Phone } from "lucide-react";
+import { MonitorPlay, ListChecks, ArrowUpRight, LogOut, Phone, Calendar, Gift } from "lucide-react";
 import { AdminLogin } from "@/components/admin/AdminLogin";
 import { KDS } from "@/components/admin/KDS";
 import { MenuManager } from "@/components/admin/MenuManager";
 import { PhoneOrderForm } from "@/components/admin/PhoneOrderForm";
+import { ReservationsManager } from "@/components/admin/ReservationsManager";
+import { GiftCardManager } from "@/components/admin/GiftCardManager";
 import { useChime } from "@/lib/useChime";
 
-type Tab = "kds" | "menu";
+type Tab = "kds" | "menu" | "reservations" | "gift-cards";
 
 export default function AdminPage() {
   const [unlocked, setUnlocked] = useState(false);
@@ -41,6 +43,8 @@ export default function AdminPage() {
   const tabs: { id: Tab; label: string; icon: typeof MonitorPlay }[] = [
     { id: "kds", label: "Kitchen Display", icon: MonitorPlay },
     { id: "menu", label: "Menu Management", icon: ListChecks },
+    { id: "reservations", label: "Reservations", icon: Calendar },
+    { id: "gift-cards", label: "Gift Cards", icon: Gift },
   ];
 
   return (
@@ -125,15 +129,16 @@ export default function AdminPage() {
       </header>
 
       <main className="mx-auto max-w-7xl px-5 py-7">
-        {tab === "kds" ? (
+        {tab === "kds" && (
           <KDS
             chime={chime}
             soundOn={soundOn}
             onToggleSound={() => setSoundOn((v) => !v)}
           />
-        ) : (
-          <MenuManager />
         )}
+        {tab === "menu" && <MenuManager />}
+        {tab === "reservations" && <ReservationsManager />}
+        {tab === "gift-cards" && <GiftCardManager />}
       </main>
 
       {/* Phone order form slide-in */}
