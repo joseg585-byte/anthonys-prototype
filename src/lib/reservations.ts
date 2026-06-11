@@ -21,6 +21,7 @@ export interface NewReservationInput {
   occasion: OccasionType;
   specialRequests?: string;
   customerId?: string;
+  source?: "online" | "phone";
 }
 
 interface ReservationsState {
@@ -44,6 +45,7 @@ export const useReservations = create<ReservationsState>()(
           id: `res-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           restaurantSlug: RESTAURANT.slug,
           status: "pending",
+          source: input.source,
           name: input.name,
           email: input.email,
           phone: input.phone,

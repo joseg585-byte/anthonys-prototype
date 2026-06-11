@@ -1,8 +1,9 @@
 "use client";
 
 import { useState } from "react";
-import { Gift, TrendingUp, Calendar, Search } from "lucide-react";
+import { Gift, TrendingUp, Calendar, Search, Phone } from "lucide-react";
 import { useGiftCards } from "@/lib/giftCards";
+import { PhoneGiftCardForm } from "./PhoneGiftCardForm";
 import { formatPrice, clockTime } from "@/lib/format";
 import type { GiftCard, GiftCardStatus } from "@/lib/types";
 
@@ -38,6 +39,11 @@ function GiftCardRow({ gc }: { gc: GiftCard }) {
             >
               {gc.status}
             </span>
+            {gc.source === "phone" && (
+              <span className="rounded-full bg-gold/20 px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-wide text-gold">
+                PHONE
+              </span>
+            )}
           </div>
 
           <div className="mt-2 grid grid-cols-2 gap-x-6 gap-y-1 text-xs text-cream/60">
@@ -96,6 +102,7 @@ export function GiftCardManager() {
   const giftCards = useGiftCards((s) => s.giftCards);
   const [search, setSearch] = useState("");
   const [filter, setFilter] = useState<GiftCardStatus | "all">("all");
+  const [showPhoneForm, setShowPhoneForm] = useState(false);
 
   const totalRevenue = giftCards.reduce((n, gc) => n + gc.amountCents, 0);
   const totalOutstanding = giftCards
@@ -128,7 +135,18 @@ export function GiftCardManager() {
             {giftCards.length} total
           </p>
         </div>
+        <button
+          onClick={() => setShowPhoneForm(true)}
+          className="inline-flex items-center gap-2 rounded-full bg-gold px-4 py-2 text-xs font-bold text-espresso shadow-md transition-all hover:scale-[1.02] hover:bg-gold-light active:scale-95"
+        >
+          <Phone size={14} />
+          + New Gift Card
+        </button>
       </div>
+
+      {showPhoneForm && (
+        <PhoneGiftCardForm onClose={() => setShowPhoneForm(false)} />
+      )}
 
       {/* Stats */}
       <div className="mb-6 grid grid-cols-2 gap-4 sm:grid-cols-3">

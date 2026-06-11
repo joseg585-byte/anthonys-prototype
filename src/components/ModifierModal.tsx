@@ -1,6 +1,7 @@
 "use client";
 
 import { useState, useMemo } from "react";
+import { createPortal } from "react-dom";
 import { AnimatePresence, motion } from "framer-motion";
 import { X, Plus, Minus } from "lucide-react";
 import type { MenuItem, CartModifier } from "@/lib/types";
@@ -66,37 +67,32 @@ export function ModifierModal({ item, onClose, onAdd }: Props) {
     onClose();
   };
 
-  return (
-    <AnimatePresence>
-      <>
-        {/* Backdrop */}
-        <motion.div
-          initial={{ opacity: 0 }}
-          animate={{ opacity: 1 }}
-          exit={{ opacity: 0 }}
-          onClick={onClose}
-          className="fixed inset-0 z-[70] bg-charcoal/60 backdrop-blur-sm"
-        />
-
-        {/* Sheet */}
+  const content = (
+    <div
+      className="fixed inset-0 z-50 flex items-end justify-center bg-charcoal/60 backdrop-blur-sm sm:items-center"
+      onClick={onClose}
+    >
+      <AnimatePresence>
         <motion.div
           initial={{ opacity: 0, y: 32, scale: 0.97 }}
           animate={{ opacity: 1, y: 0, scale: 1 }}
           exit={{ opacity: 0, y: 16, scale: 0.97 }}
           transition={{ type: "spring", stiffness: 380, damping: 34 }}
-          className="fixed inset-x-0 bottom-0 z-[71] mx-auto max-w-lg rounded-t-2xl bg-parchment shadow-2xl sm:bottom-auto sm:top-1/2 sm:mx-4 sm:max-w-lg sm:rounded-2xl sm:-translate-y-1/2"
+          onClick={(e) => e.stopPropagation()}
+          className="flex w-full max-w-lg flex-col rounded-t-2xl bg-parchment shadow-2xl sm:max-h-[85vh] sm:rounded-2xl"
+          style={{ maxHeight: "85vh" }}
           role="dialog"
           aria-modal="true"
           aria-label={`Customise ${item.name}`}
         >
-          {/* Header */}
-          <div className="flex items-start justify-between gap-3 px-5 pt-5 pb-3 border-b border-gold/15">
+          {/* Header — non-scrollable */}
+          <div className="flex shrink-0 items-start justify-between gap-3 border-b border-gold/15 px-5 pb-3 pt-5">
             <div className="min-w-0">
               <h2 className="font-display text-xl font-bold leading-snug text-espresso">
                 {item.name}
               </h2>
               {item.description && (
-                <p className="mt-0.5 text-sm text-espresso-soft/70 line-clamp-2">
+                <p className="mt-0.5 line-clamp-2 text-sm text-espresso-soft/70">
                   {item.description}
                 </p>
               )}
@@ -104,14 +100,14 @@ export function ModifierModal({ item, onClose, onAdd }: Props) {
             <button
               onClick={onClose}
               aria-label="Close"
-              className="mt-0.5 shrink-0 grid h-8 w-8 place-items-center rounded-full text-espresso-soft/50 transition-colors hover:bg-cream-deep hover:text-espresso"
+              className="mt-0.5 grid h-8 w-8 shrink-0 place-items-center rounded-full text-espresso-soft/50 transition-colors hover:bg-cream-deep hover:text-espresso"
             >
               <X size={18} />
             </button>
           </div>
 
-          {/* Scrollable body */}
-          <div className="scroll-elegant max-h-[58vh] overflow-y-auto px-5 py-4 space-y-5 sm:max-h-[55vh]">
+          {/* Scrollable body — modifier groups + special requests */}
+          <div className="scroll-elegant flex-1 space-y-5 overflow-y-auto px-5 py-4">
             {/* Modifier groups */}
             {grouped.map(({ cat, items: mods }) => (
               <div key={cat}>
@@ -140,7 +136,7 @@ export function ModifierModal({ item, onClose, onAdd }: Props) {
                             }`}
                           >
                             {isOn && (
-                              <svg viewBox="0 0 10 8" fill="none" className="w-3 h-3">
+                              <svg viewBox="0 0 10 8" fill="none" className="h-3 w-3">
                                 <path
                                   d="M1 4l2.5 2.5L9 1"
                                   stroke="currentColor"
@@ -156,7 +152,7 @@ export function ModifierModal({ item, onClose, onAdd }: Props) {
                           </span>
                         </span>
                         <span
-                          className={`text-sm font-semibold shrink-0 ${
+                          className={`shrink-0 text-sm font-semibold ${
                             mod.priceCents > 0 ? "text-gold-deep" : "text-espresso-soft/50"
                           }`}
                         >
@@ -180,15 +176,14 @@ export function ModifierModal({ item, onClose, onAdd }: Props) {
                   onChange={(e) => setSpecialRequests(e.target.value)}
                   placeholder="e.g. extra crispy, sauce on the side, no salt"
                   rows={2}
-                  className="focus-gold w-full rounded-lg border border-gold/25 bg-cream/70 px-3.5 py-2.5 text-sm text-espresso placeholder:text-espresso-soft/40 resize-none transition-colors"
+                  className="focus-gold w-full resize-none rounded-lg border border-gold/25 bg-cream/70 px-3.5 py-2.5 text-sm text-espresso placeholder:text-espresso-soft/40 transition-colors"
                 />
               </div>
             )}
           </div>
 
-          {/* Footer */}
-          <div className="sticky bottom-0 border-t border-gold/15 bg-parchment/95 px-5 py-4 backdrop-blur">
-            {/* Qty stepper + total */}
+          {/* Footer — qty stepper + single Add to Order button */}
+          <div className="shrink-0 border-t border-gold/15 bg-parchment/95 px-5 py-4 backdrop-blur">
             <div className="mb-3 flex items-center justify-between gap-3">
               <div className="inline-flex items-center gap-1 rounded-full border border-gold/30 bg-cream">
                 <button
@@ -209,14 +204,9 @@ export function ModifierModal({ item, onClose, onAdd }: Props) {
                   <Plus size={16} />
                 </button>
               </div>
-              <div className="text-right">
-                <p className="text-xs text-espresso-soft/55">
-                  {formatPrice(unitTotal)} × {qty}
-                </p>
-                <p className="font-display text-xl font-bold text-espresso">
-                  {formatPrice(lineTotal)}
-                </p>
-              </div>
+              <p className="text-xs text-espresso-soft/55">
+                {formatPrice(unitTotal)} × {qty}
+              </p>
             </div>
 
             <button
@@ -227,7 +217,10 @@ export function ModifierModal({ item, onClose, onAdd }: Props) {
             </button>
           </div>
         </motion.div>
-      </>
-    </AnimatePresence>
+      </AnimatePresence>
+    </div>
   );
+
+  if (typeof document === "undefined") return null;
+  return createPortal(content, document.body);
 }

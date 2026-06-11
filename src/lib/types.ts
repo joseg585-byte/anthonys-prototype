@@ -112,6 +112,7 @@ export interface Reservation {
   id: string;
   restaurantSlug: string;
   status: ReservationStatus;
+  source?: "online" | "phone";
   name: string;
   email: string;
   phone: string;
@@ -134,6 +135,7 @@ export interface GiftCard {
   id: string;
   code: string;
   restaurantSlug: string;
+  source?: "online" | "phone";
   amountCents: number;
   balanceCents: number;
   recipientName: string;

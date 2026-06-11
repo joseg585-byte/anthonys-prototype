@@ -11,8 +11,10 @@ import {
   RotateCcw,
   ChevronDown,
   ChevronUp,
+  Phone,
 } from "lucide-react";
 import { useReservations } from "@/lib/reservations";
+import { PhoneReservationForm } from "./PhoneReservationForm";
 import type { Reservation, ReservationStatus } from "@/lib/types";
 
 const STATUS_STYLES: Record<
@@ -75,6 +77,11 @@ function ReservationRow({ r }: { r: Reservation }) {
             >
               {s.label}
             </span>
+            {r.source === "phone" && (
+              <span className="rounded-full bg-gold/20 px-2 py-0.5 text-[0.6rem] font-bold uppercase tracking-wide text-gold">
+                PHONE
+              </span>
+            )}
           </div>
           <div className="mt-1.5 flex flex-wrap gap-x-4 gap-y-1 text-xs text-cream/60">
             <span className="flex items-center gap-1">
@@ -265,6 +272,7 @@ function ReservationRow({ r }: { r: Reservation }) {
 export function ReservationsManager() {
   const reservations = useReservations((s) => s.reservations);
   const [filter, setFilter] = useState<ReservationStatus | "all">("all");
+  const [showPhoneForm, setShowPhoneForm] = useState(false);
 
   const filtered =
     filter === "all"
@@ -292,7 +300,18 @@ export function ReservationsManager() {
             {counts.pending} pending · {counts.confirmed} confirmed
           </p>
         </div>
+        <button
+          onClick={() => setShowPhoneForm(true)}
+          className="inline-flex items-center gap-2 rounded-full bg-gold px-4 py-2 text-xs font-bold text-espresso shadow-md transition-all hover:scale-[1.02] hover:bg-gold-light active:scale-95"
+        >
+          <Phone size={14} />
+          + New Reservation
+        </button>
       </div>
+
+      {showPhoneForm && (
+        <PhoneReservationForm onClose={() => setShowPhoneForm(false)} />
+      )}
 
       {/* Filter tabs */}
       <div className="mb-5 flex flex-wrap gap-2">

@@ -14,6 +14,7 @@ export interface NewGiftCardInput {
   senderEmail: string;
   message?: string;
   deliverAt?: string;
+  source?: "online" | "phone";
 }
 
 interface GiftCardsState {
@@ -44,6 +45,7 @@ export const useGiftCards = create<GiftCardsState>()(
           id: `gc-${Date.now()}-${Math.random().toString(36).slice(2, 6)}`,
           code: generateCode(),
           restaurantSlug: RESTAURANT.slug,
+          source: input.source,
           amountCents: input.amountCents,
           balanceCents: input.amountCents,
           recipientName: input.recipientName,
